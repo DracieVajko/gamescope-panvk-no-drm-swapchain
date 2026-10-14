@@ -1,0 +1,76 @@
+--- a/src/rendervulkan.cpp	2026-10-14 19:19:53.374316452 +0200
++++ b/src/rendervulkan.cpp	2026-10-14 19:19:53.445872470 +0200
+@@ -478,34 +478,49 @@
+ 		};
+ 		vk.GetPhysicalDeviceProperties2( physDev(), &props2 );
+ 
+-		if ( !GetBackend()->UsesVulkanSwapchain() && !drmProps.hasPrimary ) {
+-			vk_log.errorf( "physical device has no primary node" );
+-			return false;
+-		}
+-		if ( !drmProps.hasRender ) {
+-			vk_log.errorf( "physical device has no render node" );
+-			return false;
+-		}
++		// VK_EXT_physical_device_drm may be advertised by a device that exposes no
++		// DRM node at all: PanVK on Mali/kbase runs on Android, which ships no
++		// /dev/dri. A backend that presents through a Vulkan swapchain (SDL) does
++		// not need DRM node access, so let it run without one. A device that
++		// exposes any node, and every backend that does not use a Vulkan
++		// swapchain, keeps the original requirements exactly.
++		const bool bSwapchainBackend = GetBackend()->UsesVulkanSwapchain();
++		const bool bHasAnyDrmNode = drmProps.hasPrimary || drmProps.hasRender;
+ 
+-		dev_t renderDevId = makedev( drmProps.renderMajor, drmProps.renderMinor );
+-		drmDevice *drmDev = nullptr;
+-		if (drmGetDeviceFromDevId(renderDevId, 0, &drmDev) != 0) {
+-			vk_log.errorf( "drmGetDeviceFromDevId() failed" );
+-			return false;
++		if ( !bHasAnyDrmNode && bSwapchainBackend ) {
++			vk_log.warnf( "physical device reports no DRM nodes; swapchain backend will run without DRM node access" );
++		} else {
++			if ( !bSwapchainBackend && !drmProps.hasPrimary ) {
++				vk_log.errorf( "physical device has no primary node" );
++				return false;
++			}
++			if ( !drmProps.hasRender ) {
++				vk_log.errorf( "physical device has no render node" );
++				return false;
++			}
+ 		}
+-		assert(drmDev->available_nodes & (1 << DRM_NODE_RENDER));
+-		const char *drmRenderName = drmDev->nodes[DRM_NODE_RENDER];
+ 
+-		m_drmRendererFd = open( drmRenderName, O_RDWR | O_CLOEXEC );
+-		drmFreeDevice(&drmDev);
+-		if ( m_drmRendererFd < 0 ) {
+-			vk_log.errorf_errno( "failed to open DRM render node" );
+-			return false;
+-		}
++		if ( bHasAnyDrmNode ) {
++			dev_t renderDevId = makedev( drmProps.renderMajor, drmProps.renderMinor );
++			drmDevice *drmDev = nullptr;
++			if (drmGetDeviceFromDevId(renderDevId, 0, &drmDev) != 0) {
++				vk_log.errorf( "drmGetDeviceFromDevId() failed" );
++				return false;
++			}
++			assert(drmDev->available_nodes & (1 << DRM_NODE_RENDER));
++			const char *drmRenderName = drmDev->nodes[DRM_NODE_RENDER];
++
++			m_drmRendererFd = open( drmRenderName, O_RDWR | O_CLOEXEC );
++			drmFreeDevice(&drmDev);
++			if ( m_drmRendererFd < 0 ) {
++				vk_log.errorf_errno( "failed to open DRM render node" );
++				return false;
++			}
+ 
+-		if ( drmProps.hasPrimary ) {
+-			m_bHasDrmPrimaryDevId = true;
+-			m_drmPrimaryDevId = makedev( drmProps.primaryMajor, drmProps.primaryMinor );
++			if ( drmProps.hasPrimary ) {
++				m_bHasDrmPrimaryDevId = true;
++				m_drmPrimaryDevId = makedev( drmProps.primaryMajor, drmProps.primaryMinor );
++			}
+ 		}
+ #else
+ 		vk_log.warnf( "built without DRM support" );
