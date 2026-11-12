@@ -97,3 +97,11 @@ Pull requests for improving Reshade compatibility support are appreciated.
 ## Status of Gamescope Packages
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/gamescope.svg?exclude_unsupported=1)](https://repology.org/project/gamescope/versions)
+
+---
+
+## Support this work
+
+If you find this project useful, consider supporting its ongoing development, maintenance, and improvements.
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?logo=github)](https://github.com/sponsors/DracieVajko)
